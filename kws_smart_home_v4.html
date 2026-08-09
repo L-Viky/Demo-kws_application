@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>KWS Smart Home — Edge AI Demo</title>
+
+<!-- Manifest e meta per installazione come PWA offline su telefono (vedi sw.js) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111418">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="KWS Smart Home">
+
+<!-- Stile dell'interfaccia (topbar, pannello laterale, ecc.) -->
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Barra superiore: titolo app, badge "Edge AI", nome stanza corrente -->
+<div id="topbar">
+  <span class="tb-title">KWS SMART HOME</span>
+  <span class="tb-badge">EDGE AI — TinyML</span>
+  <span class="tb-room">Stanza: <span id="tbr">—</span></span>
+</div>
+
+<div id="main">
+
+  <!-- Area di gioco: canvas della casa top-down + fumetto di interazione -->
+  <div id="game">
+    <canvas id="house"></canvas>
+    <div id="bubble"><div class="bubble-box" id="btext"></div></div>
+  </div>
+
+  <!-- Pannello laterale: monitor KWS (waveform, ultima parola, stato, log, mic) -->
+  <div id="panel">
+    <div class="ps" style="display:flex;align-items:center;gap:7px">
+      <div class="sdot" id="sdot"></div>
+      <span style="font-size:12px;font-weight:600;letter-spacing:.5px">KWS MONITOR</span>
+    </div>
+    <div class="ps"><div class="pl">Audio input</div><canvas id="wfc"></canvas></div>
+    <div class="ps"><div class="pl">Ultima parola</div><div id="lw">—</div><div id="lwc">in attesa...</div></div>
+    <div class="ps"><div class="pl">Stato sistema</div><span class="sbadge sb-l" id="sbadge">● ascolto</span><div id="sd"></div></div>
+    <div class="ps"><div class="pl">Oggetti stanza</div><div class="rsg" id="rsg"></div></div>
+    <div class="ps pl" style="padding-bottom:3px">Log comandi</div>
+    <div id="logw"><div id="logi"></div></div>
+    <div id="micw"><button id="micb" onclick="toggleMic()"><span id="mico">🎙</span><span id="micl">Avvia ascolto</span></button></div>
+    <div id="leg">
+      <div class="li"><span class="lk">on/off</span>luci</div>
+      <div class="li"><span class="lk">up/down</span>tapparelle</div>
+      <div class="li"><span class="lk">WASD/↑↓←→</span>muovi</div>
+      <div class="li"><span class="lk">yes/no</span>interagisci</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TensorFlow.js: necessario per caricare ed eseguire il modello BNN (tfjs_model/model.json) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.22.0/tf.min.js"></script>
+<!-- Logica applicazione (rendering, collisioni, comandi, microfono, ecc.) -->
+<script src="script.js"></script>
+</body>
+</html>
