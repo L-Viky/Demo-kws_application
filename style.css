@@ -1,0 +1,186 @@
+/* ============================================================
+   KWS SMART HOME — FOGLIO DI STILE
+   Interfaccia demo Edge AI: layout a due colonne
+   (canvas della casa a sinistra + pannello di controllo a destra)
+   ============================================================ */
+
+/* Reset di base: niente margini/padding di default, box-sizing coerente */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---- VARIABILI COLORE / FONT ----
+   Definite come custom properties CSS così da poterle riusare
+   ovunque (anche nel canvas via JS, se servisse) e cambiarle in un solo posto. */
+:root {
+  --bg: #111418;          /* sfondo generale pagina */
+  --surface: #1a1f27;     /* sfondo pannelli (topbar, sidebar) */
+  --border: #2d333b;      /* colore bordi/separatori */
+  --text: #cdd9e5;        /* testo principale */
+  --text-sec: #768390;    /* testo secondario/etichette */
+  --accent: #4ac8a0;      /* verde accento: stato "ok"/attivo */
+  --accent2: #e5534b;     /* rosso accento: stato "bloccato"/errore */
+  --yellow: #e3b341;      /* giallo: usato per indicare oggetti accesi */
+  --blue: #539bf5;        /* blu: usato per indicare tapparelle aperte */
+
+  /* Font con fallback di sistema: se 'Space Grotesk'/'JetBrains Mono'
+     non sono installati sul dispositivo (es. offline, niente Google Fonts),
+     il browser usa comunque un font leggibile equivalente. */
+  --font: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', Consolas, 'Courier New', monospace;
+}
+
+/* ---- LAYOUT GENERALE ----
+   body = colonna verticale: topbar in alto, poi il main (canvas+pannello) */
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* niente scroll della pagina: l'app riempie lo schermo */
+}
+
+/* ---- BARRA SUPERIORE ----
+   Titolo app + badge "Edge AI" + nome stanza corrente (aggiornato da JS) */
+#topbar {
+  height: 42px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.tb-title { font-size: 13px; font-weight: 600; letter-spacing: .5px; }
+.tb-badge {
+  font-size: 9px;
+  background: rgba(74,200,160,.12);
+  color: var(--accent);
+  border: 1px solid rgba(74,200,160,.25);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-family: var(--mono);
+}
+.tb-room { margin-left: auto; font-size: 11px; color: var(--text-sec); font-family: var(--mono); }
+.tb-room span { color: var(--text); font-weight: 500; }
+
+/* ---- AREA PRINCIPALE ----
+   #main contiene due colonne fianco a fianco: #game (canvas) e #panel (sidebar) */
+#main { flex: 1; display: flex; overflow: hidden; }
+
+/* ---- AREA DI GIOCO (canvas della casa) ---- */
+#game {
+  flex: 1;
+  position: relative;
+  background: #0a0d12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+canvas#house { display: block; image-rendering: pixelated; } /* niente sfocatura sui pixel */
+
+/* Fumetto (bubble) che chiede "Interagire con X?" quando l'avatar è vicino a un oggetto */
+#bubble { position: absolute; display: none; pointer-events: none; z-index: 10; }
+.bubble-box {
+  background: rgba(26,31,39,.95);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 11px;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+.bubble-box.blocked { border-color: var(--accent2); color: var(--accent2); } /* variante "rifiutato" (dopo un "no") */
+
+/* ============================================================
+   PANNELLO LATERALE (KWS MONITOR)
+   Mostra: stato ascolto, waveform audio, ultima parola riconosciuta,
+   stato oggetti della stanza corrente, log comandi, pulsante microfono.
+   ============================================================ */
+#panel {
+  width: 268px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ps { padding: 10px 13px; border-bottom: 1px solid var(--border); } /* singola sezione del pannello */
+.pl {
+  font-size: 9px;
+  color: var(--text-sec);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  font-family: var(--mono);
+  margin-bottom: 6px;
+}
+
+/* Pallino di stato in alto (spento/ascolto/rilevato) */
+.sdot { width: 7px; height: 7px; border-radius: 50%; background: #2d333b; transition: all .3s; flex-shrink: 0; }
+.sdot.on { background: var(--accent); box-shadow: 0 0 0 3px rgba(74,200,160,.15); animation: sp 2s infinite; }
+.sdot.det { background: var(--accent2); } /* "det" = rilevamento parola in corso (lampeggio rosso breve) */
+@keyframes sp { /* animazione "respiro" per il pallino attivo */
+  0%, 100% { box-shadow: 0 0 0 3px rgba(74,200,160,.15); }
+  50%      { box-shadow: 0 0 0 6px rgba(74,200,160,.04); }
+}
+
+/* Waveform audio in tempo reale (canvas separato dal canvas della casa) */
+#wfc { width: 100%; height: 42px; display: block; }
+
+/* Ultima parola riconosciuta dal modello (o dalla demo simulata) */
+#lw  { font-size: 24px; font-weight: 600; color: var(--accent); font-family: var(--mono); letter-spacing: 3px; min-height: 30px; }
+#lwc { font-size: 10px; color: var(--text-sec); font-family: var(--mono); margin-top: 1px; }
+
+/* Badge di stato sistema: ascolto / proposta interazione / bloccato */
+.sbadge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 10px; font-size: 10px; font-family: var(--mono); }
+.sb-l { background: rgba(74,200,160,.08); color: var(--accent);  border: 1px solid rgba(74,200,160,.2); } /* listening */
+.sb-i { background: rgba(229,83,75,.08);  color: var(--accent2); border: 1px solid rgba(229,83,75,.2); }  /* interact/proposta */
+.sb-b { background: rgba(100,40,40,.08);  color: #a05050;        border: 1px solid rgba(100,40,40,.2); }  /* blocked */
+#sd { font-size: 10px; color: var(--text-sec); font-family: var(--mono); margin-top: 4px; min-height: 14px; }
+
+/* Griglia con lo stato di ogni oggetto della stanza corrente (luce, tapparella, ecc.) */
+.rsg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 5px; }
+.rsr { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-sec); font-family: var(--mono); }
+.rsd { width: 5px; height: 5px; border-radius: 50%; background: var(--border); flex-shrink: 0; transition: background .3s; }
+.rsd.on   { background: var(--yellow); } /* oggetto acceso (luce/TV/camino/frigo/pc) */
+.rsd.open { background: var(--blue); }   /* tapparella aperta */
+
+/* Log comandi vocali (lista scrollabile in fondo al pannello) */
+#logw { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+#logi { flex: 1; overflow-y: auto; padding: 4px 13px 8px; display: flex; flex-direction: column; gap: 2px; }
+#logi::-webkit-scrollbar { width: 3px; }
+#logi::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.le { font-size: 10px; font-family: var(--mono); color: var(--text-sec); line-height: 1.5; } /* singola riga di log */
+.le .lts { color: #3d4450; margin-right: 4px; } /* timestamp */
+.le .lw  { color: var(--accent); font-weight: 500; } /* parola riconosciuta */
+.le .la  { color: var(--text); } /* azione eseguita */
+.le.bl .lw { color: var(--accent2); } /* riga di log per un comando bloccato/rifiutato */
+
+/* Pulsante avvia/ferma ascolto microfono */
+#micw { padding: 10px 13px; border-top: 1px solid var(--border); }
+#micb {
+  width: 100%; padding: 8px;
+  background: rgba(74,200,160,.08);
+  border: 1px solid rgba(74,200,160,.2);
+  border-radius: 6px;
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 12px; font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+#micb:hover { background: rgba(74,200,160,.15); }
+#micb.active { background: rgba(229,83,75,.08); border-color: rgba(229,83,75,.2); color: var(--accent2); } /* mentre ascolta */
+
+/* Legenda comandi vocali/tastiera in fondo al pannello */
+#leg { padding: 8px 13px; border-top: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.li { font-size: 9px; color: var(--text-sec); font-family: var(--mono); display: flex; align-items: center; gap: 3px; }
+.lk { color: var(--accent); font-weight: 500; min-width: 34px; }
