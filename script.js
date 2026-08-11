@@ -631,12 +631,7 @@ function setSystemState(state,detail){
 }
 
  
-// GESTIONE COMANDI VOCALI (o simulati/da tastiera)
-// Questo è il punto in cui, in futuro, arriveranno le predizioni della BNN
-// (parola riconosciuta + confidenza). Per ora viene chiamata da:
-//  - la sequenza demo automatica (DEMO[], vedi sezione BNN PLACEHOLDER)
-//  - i tasti rapidi y/n/o/f/u (vedi sezione KEYBOARD)
- 
+// GESTIONE COMANDI VOCALI (o simulati/da tastiera) 
 function handleCommand(word,conf){
   // Lampeggio rosso del pallino di stato per dare feedback "ho sentito qualcosa"
   const dot=document.getElementById('sdot');
@@ -669,7 +664,7 @@ function handleCommand(word,conf){
 
   } else if(word==='no'){
     // "no" blocca l'oggetto vicino: verrà ignorato finché non scade BLOCK_TIMEOUT
-    // o l'avatar non si allontana abbastanza (vedi gameLoop)
+    // o l'avatar non si allontana abbastanza
     if(nearObj){
       blockedObj=nearObj;
       interactionEnabled=false;
@@ -686,9 +681,6 @@ function handleCommand(word,conf){
     } else action='nessun oggetto vicino';
 
   } else if(['on','off','up','down'].includes(word)){
-    // on/off/up/down agiscono sull'oggetto SOLO se l'interazione è stata
-    // sbloccata con un "yes" precedente (interactionEnabled).
-    // Lontano da qualunque oggetto, up/down diventano movimento dell'avatar.
     if(!interactionEnabled){
       if((word==='up'||word==='down')&&!nearObj){action=voiceMoveCommand(word);}
       else if(nearObj===blockedObj){action='ignorato (bloccato)';blocked=true;}
@@ -708,9 +700,7 @@ function handleCommand(word,conf){
   updateRoomStatus();
 }
 
-// Comandi vocali di movimento: left/right/up/down avviano una marcia continua
-// (applicata in gameLoop finché non arriva "stop" o un tasto di movimento),
-// "go" riparte nell'ultima direzione, "stop" ferma.
+// Comandi vocali di movimento
 function voiceMoveCommand(word){
   if(word==='stop'){
     if(voiceMove.dx||voiceMove.dy){voiceMove.dx=0;voiceMove.dy=0;return '🧍 avatar fermato';}
@@ -766,7 +756,6 @@ function updateRoomStatus(){
 
  
 // LOG COMANDI — aggiunge una riga al pannello di log (max 60 righe visibili)
- 
 function addLog(word,conf,action,blocked){
   const log=document.getElementById('logi');
   const now=new Date();
@@ -781,7 +770,6 @@ function addLog(word,conf,action,blocked){
 
  
 // WAVEFORM — barre animate nel pannello che simulano/mostrano il segnale audio
- 
 const wfc=document.getElementById('wfc');
 const wfx=wfc.getContext('2d');
 
@@ -797,9 +785,7 @@ function drawWF(){
   });
   wfx.globalAlpha=1;
 }
-// Loop separato dal game loop principale: legge i dati audio reali dal microfono
-// (se micActive e analyser esistono) oppure genera valori casuali "finti" per
-// dare comunque un feedback visivo quando il microfono non è attivo
+// Loop separato dal game loop principale
 function animWF(){
   if(analyser){
     const buf=new Uint8Array(analyser.fftSize);
@@ -816,22 +802,11 @@ function animWF(){
  
 // MICROFONO — richiesta permesso e avvio/stop della cattura audio
 // NB: richiede un "contesto sicuro" (HTTPS o localhost) per funzionare nel browser.
- 
-
-// Crea AudioContext + nodi audio a partire dallo stream del microfono.
-// preferredRate: sample rate da richiedere al contesto (null = default del device).
-// Se la connessione del mic a quel rate non è supportata (Firefox lancia
-// NotSupportedError su createMediaStreamSource quando il rate del contesto
-// differisce da quello hardware), riprova una volta al rate nativo: la
-// conversione verso 16 kHz avviene comunque in bnnOnAudioProcess.
 async function bnnConnectAudioGraph(stream, preferredRate){
   const Ctor=window.AudioContext||window.webkitAudioContext;
   let srcNode;
   try{
     audioCtx=preferredRate?new Ctor({sampleRate:preferredRate}):new Ctor();
-    // Alcuni browser creano l'AudioContext in stato "suspended" finché non
-    // viene ripreso esplicitamente: senza questo, lo ScriptProcessorNode
-    // non riceve mai eventi onaudioprocess e il ring buffer resta vuoto.
     if(audioCtx.state==='suspended') await audioCtx.resume();
     srcNode=audioCtx.createMediaStreamSource(stream);
   }catch(e){
@@ -843,10 +818,6 @@ async function bnnConnectAudioGraph(stream, preferredRate){
   analyser=audioCtx.createAnalyser();analyser.fftSize=256;
   srcNode.connect(analyser);
 
-  // ScriptProcessorNode: accumula i campioni grezzi nel ring buffer usato
-  // dal preprocessing BNN (vedi sezione BNN — CATTURA AUDIO più sotto).
-  // NB: deprecato ma il modo più semplice/compatibile per avere accesso
-  // ai campioni raw in tempo reale senza un AudioWorklet dedicato.
   bnnProcessor=audioCtx.createScriptProcessor(4096,1,1);
   srcNode.connect(bnnProcessor);
   bnnProcessor.connect(audioCtx.destination); // necessario in alcuni browser perché onaudioprocess scatti
@@ -854,8 +825,6 @@ async function bnnConnectAudioGraph(stream, preferredRate){
   console.log('[BNN debug] AudioContext state:', audioCtx.state, '- sampleRate:', audioCtx.sampleRate);
 }
 
-// Smonta e rilascia tutta la catena audio (usata sia allo spegnimento sia
-// nel cleanup dopo un errore di setup, così il mic non resta acceso orfano).
 function bnnTeardownAudio(){
   if(bnnProcessor){bnnProcessor.disconnect();bnnProcessor.onaudioprocess=null;bnnProcessor=null;}
   if(micStream)micStream.getTracks().forEach(t=>t.stop());
@@ -880,9 +849,7 @@ async function toggleMic(){
         bnnSilenceSecs=0;bnnSignalSeen=false;bnnGraphRebuilt=false;
         const track=stream.getAudioTracks()[0];
         if(track)console.log('[BNN debug] traccia mic:',track.label,'muted=',track.muted,track.getSettings());
-        // Primo tentativo direttamente a 16 kHz (rate di training): se il
-        // grafo non fornisce segnale, il watchdog in bnnOnAudioProcess
-        // ricrea la cattura al rate nativo del device.
+        // Primo tentativo direttamente a 16 kHz (rate di training)
         await bnnConnectAudioGraph(stream,BNN_CFG.sampleRate);
 
         micActive=true;
@@ -921,65 +888,34 @@ async function toggleMic(){
 
  
 // BNN — CONFIGURAZIONE
-// Questi parametri DEVONO combaciare esattamente con quelli usati nello
-// script Python di training/preprocessing, altrimenti il modello riceve
-// input fuori distribuzione e le predizioni sono spazzatura anche se il
-// modello stesso è corretto.
-// Verificato il 2026-08-06 contro KWS/main_v5.py (preprocess()):
-//   tf.signal.stft(frame_length=400, frame_step=160, fft_length default 512,
-//   Hann periodica) -> tf.abs -> linear_to_mel_weight_matrix(32, 257, 16000,
-//   20, 8000) -> log(x+1e-6); nessuna normalizzazione ulteriore; audio
-//   int16/32768 in [-1,1) (stessa scala dei float di Web Audio); WORDS
-//   nello stesso ordine di enumerate() nel training.
- 
-// Ordine = indici di output del modello (= ordine label TFDS del training).
-// Le ultime due esistono solo nel modello run8+ (12 classi): non sono comandi,
-// bnnRunInference le scarta prima di handleCommand. Con il modello run7
-// (10 uscite) restano semplicemente inutilizzate.
 const WORDS=['down','go','left','no','off','on','right','stop','up','yes','_silence_','_unknown_'];
 const BNN_CFG = {
   sampleRate:  16000,
   frameLength: 400,   // 25ms a 16kHz
-  frameStep:   312,   // hop 19.5ms: 51 frame coprono esattamente 16000 campioni (1s), come nel training run7 (main_v7.py)
+  frameStep:   312,   // hop 19.5ms: 51 frame coprono esattamente 16000 campioni (1s)
   nFFT:        512,   // prima potenza di 2 >= frameLength (per la FFT)
   nMels:       32,
   fMin:        20,
-  fMax:        8000,  // come nel training (main_v7.py): NON cambiare fMin/fMax senza riaddestrare
+  fMax:        8000,  // come nel training: NON cambiare fMin/fMax senza riaddestrare
   nFrames:     51,    // frame temporali attesi dal modello -> input (51,32,1)
   // campioni audio necessari per produrre esattamente nFrames frame:
   get samplesNeeded(){ return (this.nFrames-1)*this.frameStep + this.frameLength; },
-  // run8 (attivo): 12 classi, augmentation, 95.93% test / 96.29% sulle 10 parole.
-  // Alternative: 'assets/tfjs_model_run7/model.json' (10 classi, 96.69%),
-  //              'assets/tfjs_model/model.json' (vecchio modello, 15.83%, hop 160!).
   modelUrl:    'assets/tfjs_model/model.json',
   confThreshold: 0.6, // sotto questa confidenza, il comando viene ignorato
   inferenceIntervalMs: 400, // ogni quanto tentare una nuova inferenza
-  // Difese contro i comandi fantasma: il vocabolario non ha una classe
-  // _silence_/_unknown_, quindi il softmax "deve" scegliere una parola anche
-  // sul silenzio. Tre filtri in cascata (vedi bnnRunInference):
   rmsGate: 0.01,      // sotto questo RMS il buffer è silenzio: inferenza saltata
   confirmRuns: 2,     // stessa parola vincente per N inferenze consecutive prima del trigger
-  refractoryMs: 1000, // pausa dopo un comando accettato (una parola resta in 2-3 finestre)
+  refractoryMs: 1000, // pausa dopo un comando accettato
   silenceWatchdogS: 2 // secondi di campioni a zero dopo cui il grafo audio è considerato muto
 };
 
  
 // BNN — CATTURA AUDIO
-// Ring buffer che accumula i campioni raw provenienti dallo ScriptProcessorNode
-// (vedi toggleMic). Teniamo sempre almeno `samplesNeeded` campioni disponibili.
- 
 let bnnProcessor=null;
 let bnnRing=new Float32Array(0);
-
-// Watchdog "grafo audio muto": su alcune piattaforme (visto su Chrome/Linux)
-// un AudioContext forzato a 16 kHz si collega al mic senza errori ma produce
-// SOLO campioni a zero (indicatore "mic in uso" acceso, waveform piatta,
-// inferenza che gira su silenzio). Se dall'avvio arrivano solo zeri per
-// silenceWatchdogS secondi, la cattura viene ricreata al rate nativo del
-// device e il resampling verso 16 kHz avviene in software qui sotto.
 let bnnSilenceSecs=0;    // secondi consecutivi di campioni ~zero dall'avvio della cattura
 let bnnSignalSeen=false; // true al primo chunk con segnale reale: da lì il silenzio è silenzio vero
-let bnnGraphRebuilt=false; // la cattura è già stata ricreata una volta (niente loop di rebuild)
+let bnnGraphRebuilt=false; // la cattura è già stata ricreata una volta
 
 async function bnnHandleSilentMic(){
   if(!micActive||!micStream) return;
@@ -987,7 +923,7 @@ async function bnnHandleSilentMic(){
   console.warn('[BNN] solo silenzio dal microfono. ctxRate=',audioCtx&&audioCtx.sampleRate,
     'track=',track&&{label:track.label,muted:track.muted,readyState:track.readyState,settings:track.getSettings()});
   if(track&&track.muted){
-    bnnSignalSeen=true; // ricreare il grafo non aiuta: è il sistema a non fornire audio
+    bnnSignalSeen=true; 
     addLog('errore','—','Traccia audio muta: il sistema non sta fornendo segnale (controllare il mic nelle impostazioni di sistema)');
     return;
   }
@@ -1026,13 +962,12 @@ function bnnOnAudioProcess(e){
     } else {
       bnnSilenceSecs+=input.length/srcRate;
       if(bnnSilenceSecs>=BNN_CFG.silenceWatchdogS){
-        bnnSilenceSecs=0; // evita re-trigger a ogni chunk mentre il rebuild (async) lavora
+        bnnSilenceSecs=0; // evita re-trigger a ogni chunk mentre il rebuild lavora
         bnnHandleSilentMic();
       }
     }
   }
-  // Se il contesto non è realmente a 16kHz (alcuni browser lo ignorano),
-  // ricampioniamo qui in modo semplice (linear interpolation) verso 16kHz.
+  
   let chunk=input;
   if(Math.abs(srcRate-BNN_CFG.sampleRate)>1){
     chunk=bnnResampleLinear(input,srcRate,BNN_CFG.sampleRate);
@@ -1044,17 +979,10 @@ function bnnOnAudioProcess(e){
   bnnRing = merged.length>keep ? merged.slice(merged.length-keep) : merged;
 }
 
-// Stato del resampler fra un chunk e il successivo: posizione di lettura
-// frazionaria residua e ultimo campione del blocco precedente. Senza questo
-// stato ogni blocco ripartirebbe da posizione 0 scartando l'offset frazionario
-// accumulato: con ratio non intero (es. 44100/16000) si introdurrebbe un
-// micro-glitch di fase a ogni confine di blocco (~ogni 93 ms a 44.1 kHz).
-let bnnResampleState=null; // {pos: offset frazionario, last: ultimo campione del blocco precedente}
+let bnnResampleState=null;
 
 function bnnResampleLinear(buf,fromRate,toRate){
   const ratio=fromRate/toRate;
-  // Il flusso è continuo: anteponi l'ultimo campione del blocco precedente e
-  // riprendi la lettura dalla posizione frazionaria dove si era interrotta.
   let ext,pos;
   if(bnnResampleState){
     ext=new Float32Array(buf.length+1);
@@ -1070,7 +998,7 @@ function bnnResampleLinear(buf,fromRate,toRate){
   for(let i=0;i<outLen;i++){
     const srcPos=pos+i*ratio, i0=Math.floor(srcPos), frac=srcPos-i0;
     const s0=ext[i0];
-    const s1=(i0+1<=maxIdx)?ext[i0+1]:s0; // niente ||: il valore 0 è un campione legittimo
+    const s1=(i0+1<=maxIdx)?ext[i0+1]:s0;
     out[i]=s0+(s1-s0)*frac;
   }
   bnnResampleState={pos:pos+outLen*ratio-maxIdx, last:ext[maxIdx]};
@@ -1078,12 +1006,7 @@ function bnnResampleLinear(buf,fromRate,toRate){
 }
 
  
-// BNN — PREPROCESSING (STFT + mel filterbank), identico al training Python
- 
-
-// Finestra di Hann PERIODICA (default di tf.signal.stft in Python).
-// NB: periodica significa denominatore N (frameLength), non N-1 come nella
-// variante "simmetrica" comune altrove — dettaglio che conta per il match esatto.
+// BNN — PREPROCESSING (STFT + mel filterbank), identico al training
 const bnnHann = (()=>{
   const N=BNN_CFG.frameLength, w=new Float32Array(N);
   for(let i=0;i<N;i++) w[i]=0.5-0.5*Math.cos(2*Math.PI*i/N);
@@ -1118,13 +1041,6 @@ function bnnFFT(re,im){
 }
 
 // Matrice mel filterbank (nMels x (nFFT/2+1)), precalcolata una sola volta.
-// Replica tf.signal.linear_to_mel_weight_matrix, che è esattamente ciò che usa
-// il training (KWS/main_v5.py, preprocess()): la frequenza di OGNI bin FFT
-// viene convertita in mel e i triangoli
-// sono valutati nello spazio mel continuo — niente quantizzazione degli edge a
-// indici interi di bin (variante HTK/python_speech_features, che con fMin=20 e
-// 32 mel su 257 bin deforma sensibilmente i primi filtri). Il bin DC resta a
-// zero (bands_to_zero=1 in tf.signal). Costante 1127.0 come _MEL_HIGH_FREQUENCY_Q.
 const bnnMelFB = (()=>{
   const {nFFT,nMels,fMin,fMax,sampleRate}=BNN_CFG;
   const nBins=nFFT/2+1;
@@ -1137,8 +1053,8 @@ const bnnMelFB = (()=>{
   const fb=Array.from({length:nMels},()=>new Float32Array(nBins));
   for(let m=0;m<nMels;m++){
     const lower=edges[m], center=edges[m+1], upper=edges[m+2];
-    for(let k=1;k<nBins;k++){ // k=0 (DC) resta a zero
-      const mel=hzToMel(k*nyquist/(nBins-1)); // frequenza del bin k in mel
+    for(let k=1;k<nBins;k++){
+      const mel=hzToMel(k*nyquist/(nBins-1));
       const lowSlope=(mel-lower)/(center-lower);
       const upSlope=(upper-mel)/(upper-center);
       fb[m][k]=Math.max(0,Math.min(lowSlope,upSlope));
@@ -1147,14 +1063,6 @@ const bnnMelFB = (()=>{
   return fb;
 })();
 
-// Calcola il log-mel spectrogram (nFrames x nMels) da un buffer audio raw a 16kHz.
-// Deve rispecchiare ESATTAMENTE: tf.signal.stft (finestra Hann periodica, fft_length
-// = prima potenza di 2 >= frame_length) -> tf.abs() (MAGNITUDO, non potenza) ->
-// linear_to_mel_weight_matrix -> log(x + 1e-6). Vedi KWS/main_v5.py, preprocess().
-// Differenza voluta rispetto al training: lì il log-mel viene tagliato ai PRIMI
-// 51 frame della clip da 1 s ([:51]), qui i 51 frame vengono dagli ULTIMI 8400
-// campioni del ring (finestra scorrevole real-time). Stessa pipeline, stessa
-// shape: la parola va solo pronunciata per intero dentro la finestra da 525 ms.
 function bnnComputeLogMel(samples){
   const {frameLength,frameStep,nFFT,nFrames,nMels}=BNN_CFG;
   const out=Array.from({length:nFrames},()=>new Float32Array(nMels));
@@ -1165,47 +1073,23 @@ function bnnComputeLogMel(samples){
     bnnFFT(re,im);
     const nBins=nFFT/2+1;
     const mag=new Float32Array(nBins);
-    for(let k=0;k<nBins;k++) mag[k]=Math.sqrt(re[k]*re[k]+im[k]*im[k]); // magnitudo, NON potenza
+    for(let k=0;k<nBins;k++) mag[k]=Math.sqrt(re[k]*re[k]+im[k]*im[k]); 
     for(let m=0;m<nMels;m++){
       let e=0; const filt=bnnMelFB[m];
       for(let k=0;k<nBins;k++) e+=mag[k]*filt[k];
       out[f][m]=Math.log(e+1e-6);
     }
   }
-  return out; // [nFrames][nMels]
+  return out;
 }
 
  
 // BNN — MODELLO E INFERENZA
-// bnnModel resta null finché non viene caricato con bnnLoadModel().
-// Finché è null, l'app continua a usare la DEMO simulata (comportamento attuale).
- 
 let bnnModel=null;
 let bnnLoopTimer=null;
 
  
 // BNN — LAYER CUSTOM (replicano BinaryConv2D / BinaryActivation di Keras)
-// Vanno registrate PRIMA di tf.loadLayersModel, altrimenti il caricamento
-// fallisce con "Unknown layer: BinaryConv2D" (o simile).
-// Definite e registrate dentro bnnRegisterCustomLayers(), chiamata (in fondo
-// al file) solo se `tf` esiste: se il CDN di TF.js non è raggiungibile lo
-// script deve comunque arrivare in fondo (listener tastiera, game loop,
-// fallback DEMO), non morire qui con un ReferenceError su `tf`.
-//
-// ATTENZIONE — punti da verificare con il tuo model.json esportato:
-// - il nome esatto sotto cui compare nel JSON (class_name) potrebbe avere
-//   un prefisso di package (es. "BinaryConv2D" vs "bnn>BinaryConv2D" o simile):
-//   className qui sotto deve combaciare ESATTAMENTE con quel valore.
-// - il Python NON applica bias né activation dentro BinaryConv2D.call()
-//   (non chiama super().call()): se nel tuo modello questi layer hanno
-//   use_bias=True, il bias va comunque sommato a parte se lo vuoi replicare
-//   fedelmente — altrimenti lascia così se il training è stato fatto senza bias.
-// - BinaryActivation è una funzione registrata come "activation" custom.
-//   Il tensorflowjs_converter potrebbe NON supportare activation custom
-//   inline sui layer standard: se il caricamento fallisce su questo punto,
-//   la soluzione più robusta è ri-esportare il modello in Python separando
-//   BinaryActivation in un proprio layers.Layer (o layers.Lambda) esplicito,
-//   così diventa un layer a sé stante e la registriamo come BinaryConv2D qui sotto.
  
 function bnnRegisterCustomLayers(){
 
@@ -1219,7 +1103,7 @@ class BinaryConv2DLayer extends tf.layers.Layer {
     this.strides   = st ? (Array.isArray(st)?st:[st,st]) : [1,1];
     this.padding   = (cfg.padding || 'valid').toUpperCase(); // tf.conv2d vuole 'SAME'|'VALID'
     const ub = cfg.useBias!==undefined ? cfg.useBias : cfg.use_bias;
-    this.useBiasCfg= ub!==undefined ? ub : false; // nel model.json risulta sempre false, niente peso di bias nel manifest
+    this.useBiasCfg= ub!==undefined ? ub : false; 
   }
   build(inputShape){
     const inCh=inputShape[inputShape.length-1];
@@ -1236,16 +1120,10 @@ class BinaryConv2DLayer extends tf.layers.Layer {
       const x = Array.isArray(inputs) ? inputs[0] : inputs;
       const w = this.kernel.read();
       let wBin = tf.sign(w);
-      wBin = tf.where(tf.equal(wBin,0), tf.onesLike(wBin), wBin); // sign(0) -> 1, come in Python
-      // NB: replica fedele del Python -> niente bias/activation qui dentro
+      wBin = tf.where(tf.equal(wBin,0), tf.onesLike(wBin), wBin); // sign(0) -> 1
       return tf.conv2d(x, wBin, this.strides, this.padding.toLowerCase());
     });
   }
-  // FONDAMENTALE: senza questo metodo TF.js usa il default ereditato dalla
-  // classe base Layer, che assume output shape == input shape. Con filters
-  // diversi dai canali in ingresso (o strides>1) questo produce shape errate
-  // propagate ai layer successivi (es. BatchNormalization si aspetta N canali
-  // ma ne riceve un numero diverso => "Shape mismatch").
   computeOutputShape(inputShape){
     const shape = Array.isArray(inputShape[0]) ? inputShape[0] : inputShape;
     const [batch,h,w] = shape;
@@ -1254,20 +1132,15 @@ class BinaryConv2DLayer extends tf.layers.Layer {
     let outH,outW;
     if(this.padding==='SAME'){
       outH=Math.ceil(h/sh); outW=Math.ceil(w/sw);
-    } else { // VALID
+    } else { 
       outH=Math.ceil((h-kh+1)/sh); outW=Math.ceil((w-kw+1)/sw);
     }
     return [batch,outH,outW,this.filters];
   }
-  static get className(){ return 'bnn>BinaryConv2D'; } // deve combaciare col class_name nel model.json
+  static get className(){ return 'bnn>BinaryConv2D'; } 
 }
 tf.serialization.registerClass(BinaryConv2DLayer);
 
-// BinaryActivation nel model.json compare annidata dentro un layer "Activation"
-// standard (config.activation = oggetto funzione), che TF.js non sa interpretare.
-// Soluzione: prima di caricare il modello, riscriviamo il JSON (vedi
-// bnnLoadPatchedModel più sotto) rinominando SOLO quei layer specifici in
-// class_name "BinaryActivation", che intercettiamo qui.
 class BinaryActivationLayer extends tf.layers.Layer {
   constructor(cfg){ super(cfg); }
   call(inputs){
@@ -1282,25 +1155,10 @@ class BinaryActivationLayer extends tf.layers.Layer {
 }
 tf.serialization.registerClass(BinaryActivationLayer);
 
-} // fine bnnRegisterCustomLayers
+}
 
  
-// BNN — CARICAMENTO "RIPARATO" DEL MODELLO
-// Il model.json esportato ha 4 layer "Activation" il cui config.activation
-// è un riferimento a funzione custom (bnn>BinaryActivation), che TF.js non
-// sa interpretare nativamente (si aspetta una stringa tipo "relu").
-// Qui scarichiamo noi il JSON, rinominiamo SOLO quei layer in class_name
-// "BinaryActivation" (intercettata da BinaryActivationLayer sopra), e
-// forniamo un IOHandler "in memoria" a tf.loadLayersModel con la topologia
-// corretta. Gli altri layer (relu, softmax, BatchNorm, Conv2D normali)
-// restano invariati.
- 
-// Converte un singolo layer.inbound_nodes dal formato Keras 3
-// ({"args":[{"config":{"keras_history":[name,nodeIdx,tensorIdx]}}],"kwargs":{...}})
-// al formato Keras 2 atteso da TF.js: [[[layer_name, node_index, tensor_index, kwargs]], ...]
-// NB: gestisce solo layer con un singolo tensore in ingresso (il nostro caso:
-// nessun Concatenate/Add multi-input nel modello). Se in futuro il modello
-// avesse layer multi-input andrebbe esteso per scorrere tutti gli args.
+// BNN
 function bnnConvertInboundNodes(inboundNodes){
   return inboundNodes.map(node=>{
     const args = node.args || [];
@@ -1313,9 +1171,6 @@ function bnnConvertInboundNodes(inboundNodes){
   });
 }
 
-// Ritorna contatori separati: `renamed` = layer Activation->BinaryActivation
-// (l'informazione che conta in debug), `format` = conversioni di formato
-// Keras 3 -> Keras 2 (dtype, batch_shape, inbound_nodes, input/output_layers).
 function bnnPatchTopology(modelTopology){
   const cfg = modelTopology.model_config.config;
   const layers = cfg.layers;
@@ -1323,21 +1178,19 @@ function bnnPatchTopology(modelTopology){
   for(const layer of layers){
     if(layer.class_name==='Activation'){
       const act=layer.config && layer.config.activation;
-      if(act && typeof act==='object'){ // riferimento a funzione custom, non stringa built-in
+      if(act && typeof act==='object'){ 
         layer.class_name='BinaryActivation';
         counts.renamed++;
       }
     }
-    // Keras 3 salva la shape di input come "batch_shape"; il deserializzatore
-    // di TF.js (scritto per il formato Keras 2) cerca invece "batch_input_shape".
+
     if(layer.class_name==='InputLayer' && layer.config){
       if(layer.config.batch_shape && !layer.config.batch_input_shape){
         layer.config.batch_input_shape = layer.config.batch_shape;
         counts.format++;
       }
     }
-    // Keras 3 salva dtype come oggetto DTypePolicy ({"class_name":"DTypePolicy",...})
-    // invece che come semplice stringa "float32" attesa da TF.js.
+
     if(layer.config && layer.config.dtype && typeof layer.config.dtype==='object'){
       const name = layer.config.dtype.config && layer.config.dtype.config.name;
       layer.config.dtype = name || 'float32';
@@ -1348,9 +1201,7 @@ function bnnPatchTopology(modelTopology){
       counts.format++;
     }
   }
-  // input_layers/output_layers: Keras 3 li salva come singola tripla piatta
-  // (["nome",0,0]) quando c'è un solo input/output; Keras 2 si aspetta una
-  // lista di triple ([["nome",0,0]]).
+  
   if(cfg.input_layers && typeof cfg.input_layers[0]==='string'){
     cfg.input_layers=[cfg.input_layers]; counts.format++;
   }
@@ -1370,8 +1221,6 @@ function bnnConcatArrayBuffers(buffers){
 
 async function bnnLoadPatchedModel(modelJsonUrl){
   const baseUrl = modelJsonUrl.substring(0, modelJsonUrl.lastIndexOf('/')+1);
-  // Senza il check .ok un 404 servito come pagina HTML produce errori criptici
-  // a valle (SyntaxError sul .json(), o shard "corrotti" da una error page).
   const resp = await fetch(modelJsonUrl);
   if(!resp.ok) throw new Error('HTTP '+resp.status+' su '+modelJsonUrl);
   const modelJson = await resp.json();
@@ -1379,8 +1228,6 @@ async function bnnLoadPatchedModel(modelJsonUrl){
   const patched = bnnPatchTopology(modelJson.modelTopology);
   addLog('sistema','—',`Model.json corretto: ${patched.renamed} layer BinaryActivation rinominati, ${patched.format} conversioni di formato Keras 3`);
 
-  // Scarica tutti gli shard di peso indicati nel manifest e li concatena,
-  // come richiede il formato ModelArtifacts atteso da tf.loadLayersModel.
   const manifest = modelJson.weightsManifest;
   const weightSpecs = [];
   const buffers = [];
@@ -1420,11 +1267,6 @@ async function bnnLoadModel(){
   }
 }
 
-// Sanity-check richiamabile a mano dalla console (bnnTestModel()) per
-// verificare che il forward pass funzioni correttamente, indipendentemente
-// dal preprocessing audio: se il modello è a posto, l'output deve essere
-// una probabilità finita per classe (12 con run8, 10 con run7) che somma
-// a 1 (softmax), non NaN.
 function bnnTestModel(){
   if(!bnnModel){ console.warn('Modello non ancora caricato'); return; }
   tf.tidy(()=>{
@@ -1444,28 +1286,22 @@ function startBnnLoop(){
 }
 function stopBnnLoop(){ if(bnnLoopTimer){clearInterval(bnnLoopTimer); bnnLoopTimer=null;} }
 
-// Stato anti comando-fantasma (vedi BNN_CFG: rmsGate/confirmRuns/refractoryMs):
-// il vocabolario non ha una classe silenzio/unknown, quindi senza questi filtri
-// il softmax sceglie comunque una parola anche su silenzio, ogni 400 ms.
 let bnnStreakWord=null, bnnStreak=0; // parola vincente corrente e n. di inferenze consecutive
 let bnnSuppressUntil=0;              // timestamp fino a cui l'inferenza è sospesa dopo un trigger
 let bnnGateLogCounter=0;             // throttling del log di "silenzio"
 
 function bnnRunInference(){
   if(!bnnModel || !micActive) return;
-  if(performance.now()<bnnSuppressUntil) return; // periodo refrattario dopo un comando accettato
+  if(performance.now()<bnnSuppressUntil) return;
   if(bnnRing.length<BNN_CFG.samplesNeeded){
     console.log(`[BNN debug] buffer non pieno: ${bnnRing.length}/${BNN_CFG.samplesNeeded} campioni`);
     return;
   }
   const samples=bnnRing.slice(bnnRing.length-BNN_CFG.samplesNeeded);
 
-  // Livello audio medio (RMS) del buffer appena preso: se resta sempre
-  // vicino a 0 vuol dire che non stiamo davvero ricevendo audio dal microfono.
   let sumSq=0; for(let i=0;i<samples.length;i++) sumSq+=samples[i]*samples[i];
   const rms=Math.sqrt(sumSq/samples.length);
 
-  // Gate di energia: su silenzio/rumore di fondo niente inferenza
   if(rms<BNN_CFG.rmsGate){
     bnnStreakWord=null; bnnStreak=0;
     if((bnnGateLogCounter++%8)===0) console.log(`[BNN debug] rms=${rms.toFixed(4)} sotto gate ${BNN_CFG.rmsGate}: silenzio, inferenza saltata`);
@@ -1474,9 +1310,6 @@ function bnnRunInference(){
 
   const logMel=bnnComputeLogMel(samples); // [51][32] (array di Float32Array)
 
-  // tf.tensor() con shape esplicita richiede dati FLAT, non annidati:
-  // se gli passiamo l'array [51][32] insieme a shape [1,51,32,1] fallisce
-  // perché la shape dedotta dai dati (51,32) non combacia con quella richiesta.
   const flat=new Float32Array(BNN_CFG.nFrames*BNN_CFG.nMels);
   for(let f=0;f<BNN_CFG.nFrames;f++) flat.set(logMel[f], f*BNN_CFG.nMels);
 
@@ -1487,24 +1320,19 @@ function bnnRunInference(){
     let bestI=0,bestP=0;
     for(let i=0;i<probs.length;i++) if(probs[i]>bestP){bestP=probs[i];bestI=i;}
 
-    // Log ogni ciclo (togli/riduci una volta risolto il debug)
     console.log(`[BNN debug] rms=${rms.toFixed(4)}  top="${WORDS[bestI]}" conf=${bestP.toFixed(3)}  streak=${WORDS[bestI]===bnnStreakWord?bnnStreak+1:1}/${BNN_CFG.confirmRuns}  (soglia=${BNN_CFG.confThreshold})`);
 
-    // _silence_/_unknown_ (modello 12 classi): rifiuto appreso dal modello,
-    // non un comando. Azzera lo streak cosi' mezze parole non lo accumulano.
     if(WORDS[bestI]==='_silence_'||WORDS[bestI]==='_unknown_'){
       bnnStreakWord=null; bnnStreak=0;
       return;
     }
 
     if(bestP>=BNN_CFG.confThreshold){
-      // Doppia conferma: la stessa parola deve vincere sopra soglia per
-      // confirmRuns inferenze consecutive prima di diventare un comando.
       if(WORDS[bestI]===bnnStreakWord) bnnStreak++;
       else { bnnStreakWord=WORDS[bestI]; bnnStreak=1; }
       if(bnnStreak>=BNN_CFG.confirmRuns){
         bnnStreakWord=null; bnnStreak=0;
-        bnnSuppressUntil=performance.now()+BNN_CFG.refractoryMs; // una parola resta in più finestre: non ri-triggerare
+        bnnSuppressUntil=performance.now()+BNN_CFG.refractoryMs; 
         handleCommand(WORDS[bestI],bestP);
       }
     } else {
@@ -1514,20 +1342,11 @@ function bnnRunInference(){
 }
 
  
-// DEMO — sequenza di comandi predefiniti usata quando il modello BNN
-// non è (ancora) caricato, per continuare a poter mostrare/testare l'app.
- 
 const DEMO=['yes','on','yes','up','no','yes','down','yes','off'];
 let demoIdx=0,demoTimer=null;
-// stopDemo() in testa rende startDemo idempotente: due chiamate non devono
-// lasciare in vita un secondo setInterval orfano e inarrestabile.
 function startDemo(){stopDemo();demoTimer=setInterval(()=>{if(micActive)handleCommand(DEMO[demoIdx++%DEMO.length],null);},3500);}
 function stopDemo(){if(demoTimer){clearInterval(demoTimer);demoTimer=null;}}
 
-// Se TF.js è disponibile: registra i layer custom e avvia (in background) il
-// caricamento del modello, così se il microfono viene attivato il modello è
-// già (probabilmente) disponibile. Se il CDN è irraggiungibile o il modello
-// manca, si resta sulla DEMO simulata e il resto dell'app funziona comunque.
 if(typeof tf!=='undefined'){
   bnnRegisterCustomLayers();
   bnnLoadModel();
@@ -1536,10 +1355,7 @@ if(typeof tf!=='undefined'){
 }
 
  
-// TASTIERA — WASD/frecce per il movimento (letto in gameLoop),
-// più scorciatoie per simulare i comandi vocali senza microfono:
-// y=yes, n=no, o=on, f=off, u=up (nessuna scorciatoia per "down" al momento)
- 
+// TASTIERA — WASD/frecce per il movimento
 document.addEventListener('keydown',e=>{
   keysDown[e.key]=true;
   if(e.key==='y'){e.preventDefault();handleCommand('yes',null);}
@@ -1551,8 +1367,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('keyup',e=>{delete keysDown[e.key];});
 
  
-// INIZIALIZZAZIONE — avviata una sola volta al caricamento della pagina
- 
+// INIZIALIZZAZIONE 
 window.addEventListener('resize',resize);
 resize();                       // calcola subito lo zoom giusto e disegna il primo frame
 requestAnimationFrame(gameLoop); // avvia il ciclo di gioco (movimento + ridisegno continuo)
