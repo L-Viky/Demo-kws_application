@@ -3,7 +3,7 @@
 // BNN_CFG.confThreshold (0.6, gate di bnnRunInference): i comandi tra le due
 // soglie arrivano qui e restano visibili in console come "ignored", utile
 // per tarare il valore. I comandi da tastiera/demo (conf=null) non filtrano.
-const VOICE_CONF_THRESHOLD = 0.7;
+const VOICE_CONF_THRESHOLD = 0.5;
 
 // Riferimenti al canvas principale (dove viene disegnata la casa) e al suo contesto 2D
 const C = document.getElementById('house');
@@ -152,7 +152,7 @@ function hitsObstacle(x,y,r){
 
  
 // AVATAR — posizione, raggio di collisione e velocità di movimento
-let av = {x: ROOMS_DEF.salotto.x+140, y: ROOMS_DEF.salotto.y+90, r:11, speed:3};
+let av = {x: ROOMS_DEF.salotto.x+140, y: ROOMS_DEF.salotto.y+90, r:11, speed:1.4};
 
 // Direzione verso cui l'avatar sta "guardando" (versore normalizzato).
 let facingDir = {x:0, y:1}; // default: guarda verso il basso (schermo)
@@ -639,6 +639,9 @@ function handleCommand(word,conf){
   setTimeout(()=>{dot.className='sdot'+(micActive?' on':'');},500);
   document.getElementById('lw').textContent=word.toUpperCase();
   document.getElementById('lwc').textContent=conf?`confidenza: ${(conf*100).toFixed(0)}%`:'simulazione';
+  // Specchia l'ultima parola anche nella striscia riassuntiva del pannello mobile
+  const psw=document.getElementById('panelSummaryWord');
+  if(psw) psw.textContent=word.toUpperCase();
 
   // Filtro di esecuzione sui comandi vocali (conf numerica; tastiera/demo passano)
   if(typeof conf==='number'){
@@ -682,7 +685,10 @@ function handleCommand(word,conf){
 
   } else if(['on','off','up','down'].includes(word)){
     if(!interactionEnabled){
-      if((word==='up'||word==='down')&&!nearObj){action=voiceMoveCommand(word);}
+      // up/down sono SEMPRE movimento dell'avatar finché non è attiva un'interazione
+      // (con "yes"), indipendentemente dal fatto che ci sia un oggetto vicino,
+      // che sia bloccato o che l'interazione non sia ancora stata confermata.
+      if(word==='up'||word==='down'){action=voiceMoveCommand(word);}
       else if(nearObj===blockedObj){action='ignorato (bloccato)';blocked=true;}
       else if(nearObj){action='ignorato (dì prima "yes")';}
       else action='nessun oggetto vicino';
@@ -709,13 +715,17 @@ function voiceMoveCommand(word){
   if(word==='go'){
     if(voiceLastDir){
       [voiceMove.dx,voiceMove.dy]=VOICE_DIRS[voiceLastDir];
-      return '🚶 riparto verso '+voiceLastDir;
+      return '🚶 parto verso '+voiceLastDir;
     }
-    return 'nessuna direzione memorizzata: dì left/right/up/down';
+    return 'nessuna direzione impostata: dì left/right/up/down';
   }
+  // left/right/up/down: impostano solo la direzione (e fermano un movimento in corso),
+  // il movimento vero e proprio parte solo quando arriva "go"
   voiceLastDir=word;
-  [voiceMove.dx,voiceMove.dy]=VOICE_DIRS[word];
-  return '🚶 movimento: '+word;
+  voiceMove.dx=0; voiceMove.dy=0;
+  const [fx,fy]=VOICE_DIRS[word];
+  facingDir.x=fx; facingDir.y=fy; // gira subito l'avatar verso la direzione, anche prima di "go"
+  return '➡️ direzione impostata: '+word+' (di\' "go" per partire)';
 }
 
 // Accende/spegne un oggetto (luce, TV, camino, frigo, PC) e restituisce il testo di log
@@ -1367,6 +1377,12 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('keyup',e=>{delete keysDown[e.key];});
 
  
+// PANNELLO MOBILE (bottom-sheet) — apre/chiude il monitor KWS su schermi stretti.
+// Su desktop la media query non è attiva, quindi la classe 'expanded' non ha effetto visivo.
+function togglePanel(){
+  document.getElementById('panel').classList.toggle('expanded');
+}
+
 // INIZIALIZZAZIONE 
 window.addEventListener('resize',resize);
 resize();                       // calcola subito lo zoom giusto e disegna il primo frame
@@ -1375,11 +1391,9 @@ animWF();                        // avvia il ciclo separato della waveform
 addLog('sistema','—','App pronta — WASD/frecce per muoverti, y=yes n=no o=on f=off u=up');
 
 // ---- PWA: registrazione service worker per funzionamento offline ----
-// (si attiva solo se sw.js è presente accanto a questo file; vedi conversazione
-// precedente per come pacchettizzare l'app come PWA installabile su telefono)
-/*if('serviceWorker' in navigator){
+// (sw.js ora presente nella cartella: attivo la registrazione)
+if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('sw.js').catch(err=>console.warn('SW non registrato:',err));
   });
 }
-*/

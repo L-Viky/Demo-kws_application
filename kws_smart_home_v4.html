@@ -2,18 +2,19 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>KWS Smart Home — Edge AI Demo</title>
 
 <!-- Manifest e meta per installazione come PWA offline su telefono (vedi sw.js) -->
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#111418">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="KWS Smart Home">
 
 <!-- Stile dell'interfaccia (topbar, pannello laterale, ecc.) -->
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -32,24 +33,30 @@
     <div id="bubble"><div class="bubble-box" id="btext"></div></div>
   </div>
 
-  <!-- Pannello laterale: monitor KWS (waveform, ultima parola, stato, log, mic) -->
+  <!-- Pannello laterale/bottom-sheet: monitor KWS (waveform, ultima parola, stato, log, mic).
+       Su mobile (vedi style.css) diventa una sheet ancorata in basso: l'header è sempre
+       visibile e cliccabile (togglePanel in script.js) per espandere/richiudere il corpo. -->
   <div id="panel">
-    <div class="ps" style="display:flex;align-items:center;gap:7px">
+    <div class="ps panel-header" id="panelHeader" onclick="togglePanel()">
       <div class="sdot" id="sdot"></div>
       <span style="font-size:12px;font-weight:600;letter-spacing:.5px">KWS MONITOR</span>
+      <span class="panel-summary-word" id="panelSummaryWord">—</span>
+      <span class="panel-chevron" id="panelChevron">▲</span>
     </div>
-    <div class="ps"><div class="pl">Audio input</div><canvas id="wfc"></canvas></div>
-    <div class="ps"><div class="pl">Ultima parola</div><div id="lw">—</div><div id="lwc">in attesa...</div></div>
-    <div class="ps"><div class="pl">Stato sistema</div><span class="sbadge sb-l" id="sbadge">● ascolto</span><div id="sd"></div></div>
-    <div class="ps"><div class="pl">Oggetti stanza</div><div class="rsg" id="rsg"></div></div>
-    <div class="ps pl" style="padding-bottom:3px">Log comandi</div>
-    <div id="logw"><div id="logi"></div></div>
-    <div id="micw"><button id="micb" onclick="toggleMic()"><span id="mico">🎙</span><span id="micl">Avvia ascolto</span></button></div>
-    <div id="leg">
-      <div class="li"><span class="lk">on/off</span>luci</div>
-      <div class="li"><span class="lk">up/down</span>tapparelle</div>
-      <div class="li"><span class="lk">WASD/↑↓←→</span>muovi</div>
-      <div class="li"><span class="lk">yes/no</span>interagisci</div>
+    <div id="panelBody">
+      <div class="ps"><div class="pl">Audio input</div><canvas id="wfc"></canvas></div>
+      <div class="ps"><div class="pl">Ultima parola</div><div id="lw">—</div><div id="lwc">in attesa...</div></div>
+      <div class="ps"><div class="pl">Stato sistema</div><span class="sbadge sb-l" id="sbadge">● ascolto</span><div id="sd"></div></div>
+      <div class="ps"><div class="pl">Oggetti stanza</div><div class="rsg" id="rsg"></div></div>
+      <div class="ps pl" style="padding-bottom:3px">Log comandi</div>
+      <div id="logw"><div id="logi"></div></div>
+      <div id="micw"><button id="micb" onclick="toggleMic(event)"><span id="mico">🎙</span><span id="micl">Avvia ascolto</span></button></div>
+      <div id="leg">
+        <div class="li"><span class="lk">on/off</span>luci</div>
+        <div class="li"><span class="lk">up/down</span>tapparelle</div>
+        <div class="li"><span class="lk">WASD/↑↓←→</span>muovi</div>
+        <div class="li"><span class="lk">yes/no</span>interagisci</div>
+      </div>
     </div>
   </div>
 
@@ -58,6 +65,6 @@
 <!-- TensorFlow.js: necessario per caricare ed eseguire il modello BNN (tfjs_model/model.json) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.22.0/tf.min.js"></script>
 <!-- Logica applicazione (rendering, collisioni, comandi, microfono, ecc.) -->
-<script src="script.js"></script>
+<script src="script.js?v=4"></script>
 </body>
 </html>

@@ -38,7 +38,10 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  height: 100vh;
+  height: 100vh;   /* fallback per browser senza supporto a dvh */
+  height: 100dvh;  /* "dynamic viewport height": si adatta alla barra indirizzi
+                       che appare/scompare su mobile, evitando che il fondo
+                       della pagina (il pannello) finisca fuori schermo */
   display: flex;
   flex-direction: column;
   overflow: hidden; /* niente scroll della pagina: l'app riempie lo schermo */
@@ -113,6 +116,11 @@ canvas#house { display: block; image-rendering: pixelated; } /* niente sfocatura
   flex-shrink: 0;
 }
 .ps { padding: 10px 13px; border-bottom: 1px solid var(--border); } /* singola sezione del pannello */
+.panel-header { display: flex; align-items: center; gap: 7px; flex-shrink: 0; } /* header pannello (sdot + titolo, + summary/chevron su mobile) */
+/* Corpo del pannello (tutto tranne l'header): riempie lo spazio restante,
+   sia su desktop (dove il log interno scrolla) sia su mobile (dove scrolla
+   l'intero corpo dentro la bottom-sheet, vedi media query più sotto). */
+#panelBody { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
 .pl {
   font-size: 9px;
   color: var(--text-sec);
@@ -184,3 +192,77 @@ canvas#house { display: block; image-rendering: pixelated; } /* niente sfocatura
 #leg { padding: 8px 13px; border-top: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
 .li { font-size: 9px; color: var(--text-sec); font-family: var(--mono); display: flex; align-items: center; gap: 3px; }
 .lk { color: var(--accent); font-weight: 500; min-width: 34px; }
+
+/* Elementi dell'header del pannello usati solo nella versione mobile
+   (bottom-sheet): parola riassuntiva + freccina, nascosti su desktop. */
+.panel-summary-word { display: none; }
+.panel-chevron { display: none; }
+
+/* ============================================================
+   LAYOUT MOBILE — sotto una certa larghezza, la casa occupa tutto
+   lo schermo e il pannello KWS diventa una "bottom sheet":
+   una striscia sempre visibile in basso (stato + ultima parola),
+   che si espande su tap mostrando il monitor completo.
+   ============================================================ */
+@media (max-width: 820px) {
+
+  #main { position: relative; overflow: hidden; }
+
+  /* La casa riempie tutto lo spazio disponibile sotto la topbar */
+  #game { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* Il pannello diventa una sheet ancorata in basso, sopra il canvas */
+  #panel {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    width: 100%;
+    height: 54px;              /* altezza "chiusa": solo la striscia di stato */
+    max-height: 78vh;
+    max-height: 78dvh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -6px 24px rgba(0,0,0,.45);
+    overflow: hidden;
+    transition: height .28s ease;
+    z-index: 20;
+    /* margine extra su iPhone con home indicator */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #panel.expanded { height: 78vh; height: 78dvh; }
+
+  /* Striscia sempre visibile: pallino + titolo + ultima parola + freccina */
+  .panel-header {
+    cursor: pointer;
+    user-select: none;
+    justify-content: flex-start;
+  }
+  .panel-summary-word {
+    display: inline-block;
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  .panel-chevron {
+    display: inline-block;
+    font-size: 10px;
+    color: var(--text-sec);
+    transition: transform .28s ease;
+  }
+  #panel.expanded .panel-chevron { transform: rotate(180deg); }
+
+  /* Corpo del pannello: scrolla per intero dentro la sheet quando è espansa
+     (da chiuso resta comunque tagliato via overflow:hidden su #panel) */
+  #panelBody {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Schermi molto stretti: la topbar può andare a capo senza rompersi */
+@media (max-width: 380px) {
+  #topbar { flex-wrap: wrap; height: auto; padding: 8px 12px; row-gap: 4px; }
+  .tb-room { margin-left: 0; }
+}
