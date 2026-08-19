@@ -152,7 +152,7 @@ function hitsObstacle(x,y,r){
 
  
 // AVATAR — posizione, raggio di collisione e velocità di movimento
-let av = {x: ROOMS_DEF.salotto.x+140, y: ROOMS_DEF.salotto.y+90, r:11, speed:1.4};
+let av = {x: ROOMS_DEF.salotto.x+140, y: ROOMS_DEF.salotto.y+90, r:11, speed:1};
 
 // Direzione verso cui l'avatar sta "guardando" (versore normalizzato).
 let facingDir = {x:0, y:1}; // default: guarda verso il basso (schermo)
