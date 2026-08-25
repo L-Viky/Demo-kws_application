@@ -99,7 +99,6 @@ const OBJECTS = {
   tapp_b:   {room:'bagno',   type:'shutter',   label:'Tapparella', state:'closed',x:ROOMS_DEF.bagno.x+160,     y:ROOMS_DEF.bagno.y+12,       hotR:30},
   // Cucina 
   luce_c:   {room:'cucina',  type:'lamp',      label:'Luce',       state:false,  x:WALL*2+CELL+50, y:WALL*2+CELL+150,hotR:30},
-  tapp_c:   {room:'cucina',  type:'shutter',   label:'Tapparella', state:'closed',x:WALL*2+CELL+40,  y:WALL*2+CELL+245,hotR:30},
   frigo:    {room:'cucina',  type:'fridge',    label:'Frigo',      state:false,  x:WALL*2+CELL+CELL-40,y:WALL*2+CELL+CELL-60,hotR:30},
   fornelli: {room:'cucina',  type:'stove',     label:'Fornelli',   state:false,  x:WALL*2+2*CELL-36,   y:WALL*2+CELL+130,hotR:30},
 };
