@@ -2,7 +2,7 @@
 
 A browser-based smart home simulation controlled entirely by voice commands, running a **Binarized Neural Network (BNN)** for keyword spotting directly on the device — no server, no cloud, no data leaves your phone.
 
-> 📹 **[Watch the video demo]((https://drive.google.com/file/d/1Q3IUECtZk_lkxYn46Lw0QCgklTX0x5MU/view?usp=sharing))** ← _replace this with your actual link_
+> 📹 [Watch the video demo](https://drive.google.com/file/d/1Q3IUECtZk_lkxYn46Lw0QCgklTX0x5MU/view?usp=sharing)
 
 ---
 
